@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>ModSecurity v3 IDS Connector</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#157878">
+    <link rel="stylesheet" href="css/normalize.css">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="css/cayman.css">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">ModSecurity v3 IDS Connector</h1>
+      <h2 class="project-tagline"><img src="gsoc.png" width="50" height="50"> Google Summer of Code 2016</h2>
+      <a href="https://github.com/akoul/Modsecurity-Snort" class="btn">View on GitHub</a>
+      <a href="https://github.com/akoul/Modsecurity-Snort/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/akoul/Modsecurity-Snort/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <h2>
+<a id="introduction" class="anchor" href="#introduction" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Introduction</h2>
+
+<p>From trying my hands at Google Summer of Code (GSoC) for the first time to getting selected (yay :D) and later spending 3+ hours daily trying to figure out how to complete the milestones set, this summer has been a very fruitful experience for me. Now as the final evaluation period of GSoC is just a few days away, I am excited to share my experiences working on the <b>ModSecurity v3 IDS Connector</b>. </p>
+
+<h2>
+<a id="initial-days" class="anchor" href="#initial-days" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Initial Days</h2>
+
+<p>Being an Information Security enthusiast, I was always looking for an opportunity to contribute to both the Information Security and the Open Source worlds. GSoC gave me an excellent platform to get started with these goals. While going through the list of accepted organizations, I came across ModSecurity and started going through the organization&#39;s project ideas. The project titled <b>ModSecurity IDS Connector</b> caught my eye and after long discussions with the mentors over the IRC channel, I decided I wanted to work on this project.
+ </p>
+
+<h2>
+<a id="motivation" class="anchor" href="#motivation" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Motivation behind the project</h2>
+
+<p>I got interested in ModSecurity when I found out about their need for completing their v3 (aka<a href="https://www.trustwave.com/Resources/SpiderLabs-Blog/An-Overview-of-the-Upcoming-libModSecurity/"> libmodsecurity</a>) implementation. The fact that ModSecurity was being used by millions of users around the world was a critical motivator for me to keep learning and fuelled my desire to make a positive impact on the user experience of so many people. The main objective of the project was to build a libmodsecurity connector for Snort which would enable Snort to send HTTP data to libmodsecurity for processing, after extracting the data from an HTTP buffer.
+</p>
+
+<h2>
+<a id="getting-started" class="anchor" href="#getting-started" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Getting Started</h2>
+
+<p>
+Starting out, I wanted to get the feel of ModSecurity and its working before diving into the coding part. I started by installing and compiling ModSecurity and all its dependencies and submitting the <a href="https://github.com/SpiderLabs/ModSecurity/wiki/Compilation-recipes#ubuntu-1504">compilation recipe</a> for Debian based systems. The <a href="https://github.com/SpiderLabs/ModSecurity/tree/libmodsecurity#simple-example-using-c-1">example connector</a> gave me a taste of the various libmodsecurity functions and their working. The <a href="https://github.com/SpiderLabs/ModSecurity/wiki/Reference-Manual">documentation</a> was also pretty exhaustive and covered essential aspects of the connector creation aspect. Subsequently, I shifted my focus to understanding Snort and its working. To my surprise, a newer version of Snort (<a href="https://github.com/snortadmin/snort3">Snort++</a>) was under active development. It took me quite a while to understand Snort and it&#39;s inner-working due to its large and ever-changing code base. After spending around a month reading and testing, I felt that I was ready for the coding part.
+</p>
+
+<h2>
+<a id="project-description-approach" class="anchor" href="#project-description-approach" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Project Description and Approach</h2>
+
+<p>
+An IDS/IPS, like Snort, works at layer 3/4 of OSI Model. An IDS might be very good at examining things like TCP/IP packet info, and doing some DPI but often high-level protocols like HTTP are tricky for an IDS to examine because packets can be obfuscated or out of order. On the other hand, a WAF works at layer 7 of OSI model. They are designed specifically to look at layer 7 HTTP traffic and do not care about the underlying transport mechanism. The purpose of this project was to enable an IDS like Snort to utilise the HTTP processing capabilities of ModSecurity by extracting and sending HTTP data from Snort to ModSecurity. The libmodsecurity connector would then handle collecting relevant data from Snort and sending that to the ModSecurity core for processing. Check out <a href="https://www.sans.org/security-resources/idfaq/what-is-the-difference-between-an-ips-and-a-web-application-firewall/1/25">this post</a> for a better understanding of differences between an IDS/IPS and a WAF.
+</p>
+
+<h2>
+<a id="project-specifics-execution" class="anchor" href="#project-specifics-execution" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Project Specifics and Execution</h2>
+
+<p>Snort++ is organized into a collection of built-in and plugin modules. There are several plugin types: </p>
+
+<ul>
+<li><p>Codec -  to decode and encode packets </p></li>
+<li><p>Inspector -  allow Snort functionality to be extended by dropping modular plugins</p></li>
+<li><p>Logger -  for handling events</p></li>
+</ul>
+&nbsp;
+<p><figure><img src="snort.png"><figcaption align="center"><font size="2"><b>Fig1. - Snort3X Packet Processing</b></font></figcaption></figure></p>
+
+<p>One important feature of Snort++ which proved useful in this project was the <a href="http://blog.snort.org/2015/04/snort-inspection-events.html">publish-subscribe patterns</a>. By using inspection events, it is possible for an inspector to supply data that other inspectors can process. The normalized data is not actually published. Instead, access to the data is published, and that means that subscribers can access the raw or normalized version(s) as needed.</p>
+<p>A basic example of this is provided by the extra data_log plugin. Being a passive inspector, it does nothing until it receives the data it subscribed for. By adding the following to your <a href="https://github.com/snortadmin/snort3/blob/master/lua/snort.lua">snort.lua</a> configuration, you will get a simple URI logger:</p>
+<p align="center"><code>data_log = { key = &#39;http_raw_uri&#39; }</code><p>
+<p>This feature allowed me to extract TCP and URI data from Snort. The <a href="https://www.snort.org/faq/readme-http_inspect">http_inspect</a> pre-processor publishes an HTTP URI to which a data_log plugin subscribes. The data_log plugin then writes the extracted data along with TCP data (srcIP, srcPort, desIP, desPort) to a data.log file on the system. 
+A simple example of data written in the data.log file using the sample <a href="https://github.com/akoul/Modsecurity-Snort/blob/master/http.cap">http.cap</a> present in the project repository is shown below:
+</p>
+<p align="center">
+<code>
+1466442542, 10.0.2.15, 1033, 72.21.215.82, 80, http_raw_uri, /zcheck.html<br>
+1466442542, 10.0.2.15, 1035, 72.21.215.82, 80, http_raw_uri, /zcheck.html<br>
+1466442542, 10.0.2.15, 1036, 50.17.253.86, 80, http_raw_uri, /as/udu<br>
+1466442542, 10.0.2.15, 1038, 54.231.2.68, 80, http_raw_uri, /zero.html<br>
+</code></p>
+
+<p>Once all the data was extracted and written into the <i>data.log</i>  file, I began working on the connector part. By reading data from the <i>data.log</i>  file, I was able to extract the relevant fields to be sent to the libmodsecurity functions. The libmodsecurity functions then automatically took care of the processing part by calling the ModSecurity core and passing the extracted data as arguments.
+</p>
+
+<h2>
+<a id="problems" class="anchor" href="#problems" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Problems Faced</h2>
+
+<p>I faced several problems throughout the project. They are listed as follows:</p>
+
+<p><b>1. Snort version confusion:</b></p>
+<p>Initially I spent a lot of time on Snort v2 as it the stable release version currently is use. However, on the advice of Snort developers, I shifted to Snort++ (v3) which has improved features and is much more flexible. This took up a lot of my time as shifting from one code base to other was time-consuming. Snort++ had a humongous and ever-changing code base which made it difficult to get a grasp on its workings.</p>
+<p><b>2. All HTTP data not published:</b><p>
+<p>As of now, the <i>http_inspect</i> inspector only publishes the HTTP URI which can be subscribed to by the <i>data_log</i> plugin. Other HTTP data like Http version, method, and request and response body data is currently not supported.
+</p>
+<p><b>3. New http_inspect inspector in development:</b><p>
+<p>The http_inspect inspector currently used will be depreciated in the near future and will be replaced by a newer version. However, I am unsure of the timeframe for that work to be completed.</p>
+<h2>
+<a id="future-scope" class="anchor" href="#future-scope" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Future Scope</h2>
+
+<p>The future scope of the project includes:</p>
+<p>1.  Extracting the remaining HTTP fields from Snort and sending them to libmodsecurity for processing.</p>
+<p>2. Replacing the old http_inspect plugin with the new one.</p>
+<p>3. Bug fixes and added functionality (maybe try calling libmodsecurity functions from the inspector itself).</p>
+<h2>
+<a id="links" class="anchor" href="#links" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Links</h2>
+
+<ul>
+<li><p><a href="https://github.com/akoul/Modsecurity-Snort/commits/master?author=akoul" target="_blank">List of commits</a> </p></li>
+<li><p><a href="https://summerofcode.withgoogle.com/projects/#6490908111405056" target="_blank">GSoC Project</a></p></li>
+<li><p><a href="https://in.linkedin.com/in/akoul1" target="_blank">About Me</a></p></li>
+</ul>
+
+<h2>
+<a id="acknowledgments" class="anchor" href="#acknowledgments" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Acknowledgments</h2>
+
+<p>I would like to thank <b><a href="http://chaimsanders.com/" target="_blank">Chaim Sanders</a></b> and <b><a href="https://www.linkedin.com/in/robert-paprocki-01282839?trk=prof-samename-name" target="_blank">Robert Paprocki</a></b> for guiding me throughout the project and for being wonderful mentors.</p>
+  
+<p>To know more about the ModSecurity project, take a look at the official <b><a href="https://github.com/SpiderLabs/ModSecurity/wiki/Reference-Manual" >Github</a></b> page.</p>
+
+<p>In case of any queries and feature requests, please don&#39;t hesitate in dropping a mail to: <a target="_blank">[akhil.koul8@gmail.com]</a>.</p>
+
+  </body>
+</html>
